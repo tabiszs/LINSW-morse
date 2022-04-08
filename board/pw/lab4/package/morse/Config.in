@@ -1,0 +1,8 @@
+config BR2_PACKAGE_MORSE
+	bool "morse"
+	depends on BR2_PACKAGE_LIBGPIOD
+	help
+	  Morse code transmiter
+
+comment "morse depends on gpiod library"
+	depends on !BR2_PACKAGE_LIBGPIOD
