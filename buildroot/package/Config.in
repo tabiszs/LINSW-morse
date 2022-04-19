@@ -2619,9 +2619,7 @@ menu "Text editors and viewers"
 endmenu
 
 menu "My apps"
-	source "package/worms/Config.in"
 	source "package/morse/Config.in"
-	source "package/converter/Config.in"
 endmenu
 
 endmenu

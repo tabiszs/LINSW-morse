@@ -1,5 +1,0 @@
-config BR2_PACKAGE_MORSE_CONVERTER
-	bool "converter"
-	help
-	  App to convert text into morse code
-
