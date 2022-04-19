@@ -12,6 +12,10 @@
 
 #define MAX_LIMIT 100
 
+struct gpiod_chip *chip;
+struct gpiod_line *output_line;
+struct gpiod_line *input_line;
+
 void convert(char* str, char* str1)
 {
     fflush(stdin);
@@ -393,58 +397,129 @@ void convert(char* str, char* str1)
 	return;
 }
 
+void cleanup_gpio()
+{
+	gpiod_line_release(input_line);
+	gpiod_line_release(output_line);
+	gpiod_chip_close(chip);
+}
+
+int wait_for_falling_edge(struct timespec* timeout)
+{
+	int err, val = 1;
+	err = gpiod_line_request_falling_edge_events(input_line, RECIVER);
+	if(err < 0)
+	{
+		perror("gpiod_line_request_falling_edge_events");
+		cleanup_gpio();
+		exit(1);
+	}
+
+	printf("waiting for rising edge event\n");
+	err = gpiod_line_event_wait(input_line, timeout);
+  	if(err == -1)
+	{
+    	perror("gpiod_line_event_wait");
+		cleanup_gpio();
+		exit(1);
+  	}
+  	else if(err == 0)
+  	{
+    	fprintf(stderr, "wait timed out\n");
+    	val = 0;
+  	}
+	
+	gpiod_line_release(input_line);
+	return val;
+}
+
+int wait_for_rising_edge(struct timespec* timeout)
+{
+	int err, val = 1;
+	err = gpiod_line_request_rising_edge_events(input_line, RECIVER);
+	if(err < 0)
+	{
+		perror("gpiod_line_request_rising_edge_events");
+		cleanup_gpio();
+		exit(1);
+	}
+
+	printf("waiting for rising edge event\n");
+	err = gpiod_line_event_wait(input_line, timeout);
+  	if(err == -1)
+	{
+    	perror("gpiod_line_event_wait");
+		cleanup_gpio();
+		exit(1);
+  	}
+  	else if(err == 0)
+  	{
+    	fprintf(stderr, "wait timed out\n");
+    	val = 0;
+  	}
+
+	gpiod_line_release(input_line);
+	return val;
+}
+
+void save_value()
+{
+	int val = gpiod_line_get_value(input_line);
+	if(val < 0)
+	{
+		perror("gpiod_line_get_value_bulk");
+		cleanup_gpio();
+		exit(1);
+	}
+	printf("val = %d\n", val);
+}
+
 int main(int argc, char **argv)
 {
 	char *chipname = "gpiochip0";
 	unsigned int output_line_num = 24;	// GPIO Pin #23
-	unsigned int input_line_num = 12; 	// GPIO Pin #22
+	unsigned int input_line_num = 13; 	// GPIO Pin #22
 	unsigned int error_line_num = 10; 	// GPIO Pin #10
 	unsigned int val;
-	struct gpiod_chip *chip;
-	struct gpiod_line *output_line;
-	struct gpiod_line *input_line;
 	int i, ret, err;
 	char str[MAX_LIMIT],str1[MAX_LIMIT*10];
-	struct timespec timeout;
-	struct timespec basetime;
-	basetime.tv_sec = 0;
-  	basetime.tv_nsec = 500000000;
+	struct timespec timeout = {10, 0};
+	struct timespec timelapse = {0, 0};
+	struct timespec bouncingtime = { 0,  40000000};
+	struct timespec basetime = {0 , 500000000};
 
 	convert(str, str1);
 
 	chip = gpiod_chip_open_by_name(chipname);
 	if (!chip) {
 		perror("Open chip failed\n");
-		goto end;
+		return(EXIT_FAILURE);
 	}
 
 	output_line = gpiod_chip_get_line(chip, output_line_num);
 	if (!output_line) {
 		perror("Get line failed\n");
-		goto close_chip;
+		gpiod_chip_close(chip);
+		return(EXIT_FAILURE);
 	}
 
 	input_line = gpiod_chip_get_line(chip, input_line_num);
 	if (!input_line) {
 		perror("Get line failed\n");
-		goto close_chip;
+		gpiod_chip_close(chip);
+		return(EXIT_FAILURE);
 	}
 	printf("open input and output line55\n");
 
 	ret = gpiod_line_request_output(output_line, TRANSMITER, 1);
 	if (ret < 0) {
 		perror("Request line as output failed\n");
-		goto release_output;
+		gpiod_line_release(output_line);
+		gpiod_chip_close(chip);
+		return(EXIT_FAILURE);
 	}
 
-	// ret = gpiod_line_request_input(input_line, RECIVER);
-	// if (ret < 0) {
-	// 	perror("Request line as input failed\n");
-	// 	goto release_input;
-	// }
-	printf("gpiod_line_request_output\n");
-
-	/* Send Morse Code */
+	/* TRANSMIT */
 	val = 0;
   	int timeset = 1;
 	for (i = 0; i < strlen(str1); i++) {
@@ -468,7 +543,9 @@ int main(int argc, char **argv)
 		ret = gpiod_line_set_value(output_line, val);
 		if (ret < 0) {
 			perror("Set line output failed\n");
-			goto release_output;
+			gpiod_line_release(output_line);
+			gpiod_chip_close(chip);
+			return(EXIT_FAILURE);
 		}
 		printf("Show %c sign\n", str1[i]);
 		sleep(timeset);
@@ -479,7 +556,9 @@ int main(int argc, char **argv)
 		    ret = gpiod_line_set_value(output_line, val);
     		if (ret < 0) {
 	    		perror("Set line output failed\n");
-		    	goto release_output;
+				gpiod_line_release(output_line);
+				gpiod_chip_close(chip);
+				return(EXIT_FAILURE);
     		}
 		    sleep(1);
         }
@@ -487,46 +566,52 @@ int main(int argc, char **argv)
 
 	printf("Czekaj na potwierdzenie odbiorcy. Consumer = %s\n", RECIVER);
 
-    /*  Acknowledgement */
-    // wait 10s
-
-	err = gpiod_line_request_rising_edge_events(input_line, RECIVER);
-	if(err < 0)
+    /*  RECIVE */
+	int pressed, rised, exist = 0;
+	do
 	{
-		perror("gpiod_line_request_rising_edge_events");
-		goto release_input;
+		pressed = wait_for_falling_edge(&timeout);
+		printf("after pressed button\n");
+		if(pressed)
+		{
+			exist = wait_for_rising_edge(&bouncingtime);
+			printf("after waiting bouncing time\n");
+		}
+	} while (pressed && exist);
+	
+	if(!pressed)
+	{
+		printf("Reciving closed. Bye!\n");
 	}
 
-	timeout.tv_sec = 10;
-  	timeout.tv_nsec = 0;
-	printf("waiting for rising edge event\n");
-	err = gpiod_line_event_wait(input_line, &timeout);
-  	if(err == -1)
+	if(pressed && !exist)
 	{
-    	perror("gpiod_line_event_wait");
-    	goto release_input;
-  	}
-  	else if(err == 0)
-  	{
-    	fprintf(stderr, "wait timed out\n");
-    	goto release_input;
-  	}
+		//set clock
+		struct timespec start;
+    	timespec_get(&start, TIME_UTC);
 
-	val = err = gpiod_line_get_value(input_line);
-	if(err < 0)
-	{
-		perror("gpiod_line_get_value_bulk");
-		goto release_input;
+		save_value();
+
+		// wait for rising edge
+		do
+		{
+			rised = wait_for_rising_edge(&timeout);
+			if(rised)
+			{
+				exist = wait_for_falling_edge(&bouncingtime);
+			}
+		} while (rised && exist);
+
+		if(!rised)
+		{
+			printf("Reciving closed. Bye!\n");
+		}
+
+		if(rised && exist)
+		{
+			printf("wait for new tap\n");
+		}
 	}
-	printf("val = %d\n", val);
 
-
-release_input:
-	gpiod_line_release(input_line);
-release_output:
-	gpiod_line_release(output_line);
-close_chip:
-	gpiod_chip_close(chip);
-end:
 	return 0;
 }

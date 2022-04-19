@@ -9,11 +9,15 @@ Program works on RapsberryPi4.
 
 A oczekiwanie na naciśnięcie przycisku - 10s
 
-B oczekiwanie na zbocze opadające
+B oczekiwanie na zbocze wzrastające
     a) wystąpiło w czasie 40ms -> znowu oczekujemy na naciśnięcie przycisku - 10s
 	b) timeout
 
 C zanotowanie, że naciśnięto przycisk 
-oczekiwanie na puszczenie przycisku - zbocze opadające -> timeout - 10s
+oczekiwanie na puszczenie przycisku - zbocze wzrastające -> timeout - 10s
 	a) wystąpiło w czasie 10s -> zinterpretuj i wróć do A
 	b) przerwij odbieranie. Błąd
+
+
+press button -> falling edge
+release button -> rising edge
