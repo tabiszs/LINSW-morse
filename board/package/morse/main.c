@@ -5,6 +5,7 @@
 #include <error.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <time.h>
 #include <sys/time.h>
 
 #define	TRANSMITER	"TRANSMITER"
@@ -15,385 +16,396 @@
 struct gpiod_chip *chip;
 struct gpiod_line *output_line;
 struct gpiod_line *input_line;
+struct gpiod_line_event event;
+struct timespec timeout = {10, 0};
+struct timespec bouncingtime = { 0,  20000000};
+
+const static int MORSE_UNIT =        120;
+const static int LENGTH_DOT =        1 * MORSE_UNIT;
+const static int BLINK_DAH =         3 * MORSE_UNIT;
+const static int SPACE_INTERUNIT =   1 * MORSE_UNIT;
+const static int SPACE_INTERCHAR =   3 * MORSE_UNIT;
+const static int SPACE_INTERWORD =   7 * MORSE_UNIT;
+const static int SPACE_INTERCHAR_REMAINING =   SPACE_INTERCHAR - SPACE_INTERUNIT; // character already ends with an inter-unit space, so deduct that
 
 void convert(char* str, char* str1)
 {
-    fflush(stdin);
-    printf("Enter test to convert into Morse Code :: ");
-    scanf("%[^\n]%*c", str);
+	fflush(stdin);
+	printf("Enter test to convert into Morse Code :: ");
+	scanf("%[^\n]%*c", str);
 
-    int j=0;
-    int i=0;
-    for( ; i<=strlen(str); i++)
-    {
-        str1[j++]='/';
-        switch(toupper(str[i]))
-        {
-                case 'A':
-                  str1[j++]='.';
-                  str1[j]='-';
-                    break;
+	int j=0;
+	int i=0;
+	for( ; i<=strlen(str); i++)
+	{
+		str1[j++]='/';
+		switch(toupper(str[i]))
+		{
+				case 'A':
+				  str1[j++]='.';
+				  str1[j]='-';
+					break;
 
-                case 'B':
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j]='.';
-                    break;
+				case 'B':
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j]='.';
+					break;
 
-                case 'C':
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j]='.';
-                    break;
+				case 'C':
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j]='.';
+					break;
 
-                case 'D':
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j]='.';
-                    break;
+				case 'D':
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j]='.';
+					break;
 
-                case 'E':
-                  str1[j]='.';
-                    break;
+				case 'E':
+				  str1[j]='.';
+					break;
 
-                case 'F':
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j]='.';
-                    break;
+				case 'F':
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j]='.';
+					break;
 
-                case 'G':
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j]='.';
-                  break;
+				case 'G':
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j]='.';
+				  break;
 
-                case 'H':
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j]='.';
-                    break;
+				case 'H':
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j]='.';
+					break;
 
-                case 'I':
-                  str1[j++]='.';
-                  str1[j]='.';
-                    break;
+				case 'I':
+				  str1[j++]='.';
+				  str1[j]='.';
+					break;
 
-                case 'J':
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j]='-';
-                    break;
+				case 'J':
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j]='-';
+					break;
 
-                case 'K':
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j]='-';
-                    break;
+				case 'K':
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j]='-';
+					break;
 
-                case 'L':
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j]='.';
-                  break;
+				case 'L':
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j]='.';
+				  break;
 
-                case 'M':
-                  str1[j++]='-';
-                    str1[j]='-';
-                    break;
+				case 'M':
+				  str1[j++]='-';
+					str1[j]='-';
+					break;
 
-                case 'N':
-                  str1[j++]='-';
-                  str1[j]='.';
-                    break;
+				case 'N':
+				  str1[j++]='-';
+				  str1[j]='.';
+					break;
 
-                case 'O':
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j]='-';
-                    break;
+				case 'O':
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j]='-';
+					break;
 
-                case 'P':
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j]='.';
-                    break;
+				case 'P':
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j]='.';
+					break;
 
-                case 'Q':
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j]='-';
-                    break;
+				case 'Q':
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j]='-';
+					break;
 
-                case 'R':
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j]='.';
-                    break;
+				case 'R':
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j]='.';
+					break;
 
-                case 'S':
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j]='.';
-                    break;
+				case 'S':
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j]='.';
+					break;
 
-                case 'T':
-                  str1[j]='-';
-                    break;
+				case 'T':
+				  str1[j]='-';
+					break;
 
-                case 'U':
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j]='-';
-                    break;
+				case 'U':
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j]='-';
+					break;
 
-                case 'V':
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j]='-';
-                    break;
+				case 'V':
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j]='-';
+					break;
 
-                case 'W':
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j]='-';
-                    break;
+				case 'W':
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j]='-';
+					break;
 
-                case 'X':
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j]='-';
-                    break;
+				case 'X':
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j]='-';
+					break;
 
-                case 'y':
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j]='-';
-                    break;
+				case 'y':
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j]='-';
+					break;
 
-                case 'Z':
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j]='.';
-                    break;
+				case 'Z':
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j]='.';
+					break;
 
-                case '0':
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j]='-';
-                    break;
+				case '0':
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j]='-';
+					break;
 
-                case '1':
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j]='-';
-                    break;
+				case '1':
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j]='-';
+					break;
 
-                case '2':
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j]='-';
-                    break;
+				case '2':
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j]='-';
+					break;
 
-                case '3':
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j]='-';
-                    break;
+				case '3':
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j]='-';
+					break;
 
-                case '4':
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j]='-';
-                    break;
+				case '4':
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j]='-';
+					break;
 
-                case '5':
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j]='.';
-                    break;
+				case '5':
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j]='.';
+					break;
 
-                case '6':
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j]='.';
-                    break;
+				case '6':
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j]='.';
+					break;
 
-                case '7':
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j]='.';
-                    break;
+				case '7':
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j]='.';
+					break;
 
-                case '8':
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j]='.';
-                    break;
+				case '8':
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j]='.';
+					break;
 
-                case '9':
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j]='.';
-                    break;
+				case '9':
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j]='.';
+					break;
 
-                case '.':
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j]='-';
-                    break;
+				case '.':
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j]='-';
+					break;
 
-                case ',':
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j]='-';
-                    break;
+				case ',':
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j]='-';
+					break;
 
-                case ':':
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j]='.';
-                    break;
+				case ':':
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j]='.';
+					break;
 
-                case '?':
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j]='.';
-                    break;
-
-
-                case '-':
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j]='-';
-                    break;
-
-                case ';':
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j]='.';
-                    break;
-
-                case '"':
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j]='.';
-                    break;
-
-                case '+':
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j]='.';
-                    break;
-
-                case '/':
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j]='.';
-                    break;
-
-                case '&':
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j]='.';
-                    break;
-
-                case '$':
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j]='-';
-                    break;
+				case '?':
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j]='.';
+					break;
 
 
-                case '@':
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='-';
-                  str1[j]='.';
-                    break;
+				case '-':
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j]='-';
+					break;
 
-                case '=':
-                  str1[j++]='-';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j++]='.';
-                  str1[j]='-';
-                    break;
+				case ';':
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j]='.';
+					break;
 
-                case ' ':
-                  //str1[j]='/';
-                  j--;
-                    break;
-                }
-            j++;
-    }
-    str1[j-1]='\0';
-    printf("%s\n", str1);
+				case '"':
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j]='.';
+					break;
+
+				case '+':
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j]='.';
+					break;
+
+				case '/':
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j]='.';
+					break;
+
+				case '&':
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j]='.';
+					break;
+
+				case '$':
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j]='-';
+					break;
+
+
+				case '@':
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='-';
+				  str1[j]='.';
+					break;
+
+				case '=':
+				  str1[j++]='-';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j++]='.';
+				  str1[j]='-';
+					break;
+
+				case ' ':
+				  //str1[j]='/';
+				  j--;
+					break;
+				}
+			j++;
+	}
+	str1[j-1]='\0';
+	printf("%s\n", str1);
 	return;
 }
 
@@ -407,71 +419,124 @@ void cleanup_gpio()
 int wait_for_falling_edge(struct timespec* timeout)
 {
 	int err, val = 1;
-	err = gpiod_line_request_falling_edge_events(input_line, RECIVER);
-	if(err < 0)
-	{
-		perror("gpiod_line_request_falling_edge_events");
+	printf("waiting for falling edge event\n");
+	err = gpiod_line_event_wait(input_line, timeout);
+	if(err == -1) {
+		perror("gpiod_line_event_wait");
 		cleanup_gpio();
 		exit(1);
+	} else if(err == 0) {
+		fprintf(stderr, "wait timed out\n");
+		val = 0;
 	}
 
-	printf("waiting for rising edge event\n");
-	err = gpiod_line_event_wait(input_line, timeout);
-  	if(err == -1)
-	{
-    	perror("gpiod_line_event_wait");
-		cleanup_gpio();
-		exit(1);
-  	}
-  	else if(err == 0)
-  	{
-    	fprintf(stderr, "wait timed out\n");
-    	val = 0;
-  	}
+	if(val) {
+		err = gpiod_line_event_read(input_line, &event);
+		if(err) {
+			perror("gpiod_line_event_read");
+			cleanup_gpio();
+			exit(1);
+		}
+
+		if(event.event_type == GPIOD_LINE_EVENT_FALLING_EDGE)
+			val = 1;
+		else
+			val = 0;
+	}
 	
-	gpiod_line_release(input_line);
 	return val;
 }
 
 int wait_for_rising_edge(struct timespec* timeout)
 {
 	int err, val = 1;
-	err = gpiod_line_request_rising_edge_events(input_line, RECIVER);
-	if(err < 0)
-	{
-		perror("gpiod_line_request_rising_edge_events");
-		cleanup_gpio();
-		exit(1);
-	}
-
 	printf("waiting for rising edge event\n");
 	err = gpiod_line_event_wait(input_line, timeout);
-  	if(err == -1)
-	{
-    	perror("gpiod_line_event_wait");
+	if(err == -1){
+		perror("gpiod_line_event_wait");
 		cleanup_gpio();
 		exit(1);
-  	}
-  	else if(err == 0)
-  	{
-    	fprintf(stderr, "wait timed out\n");
-    	val = 0;
-  	}
+	} else if(err == 0) {
+		fprintf(stderr, "wait timed out\n");
+		val = 0;
+	}
 
-	gpiod_line_release(input_line);
+	if(val) {
+		err = gpiod_line_event_read(input_line, &event);
+		if(err) {
+			perror("gpiod_line_event_read");
+			cleanup_gpio();
+			exit(1);
+		}
+
+		if(event.event_type == GPIOD_LINE_EVENT_RISING_EDGE)
+			val = 1;
+		else
+			val = 0;
+	}
+	
 	return val;
 }
 
 void save_value()
 {
 	int val = gpiod_line_get_value(input_line);
-	if(val < 0)
-	{
+	if(val < 0) {
 		perror("gpiod_line_get_value_bulk");
 		cleanup_gpio();
 		exit(1);
 	}
 	printf("val = %d\n", val);
+}
+
+int recive_signal()
+{
+	int pressed, rised, exist = 0;
+	do
+	{
+		pressed = wait_for_falling_edge(&timeout);
+		printf("after pressed button\n");
+		if(pressed)
+		{
+			exist = wait_for_rising_edge(&bouncingtime);
+			printf("after waiting bouncing time\n");
+		}
+	} while (pressed && exist);
+	
+	if(!pressed)
+	{
+		printf("Reciving closed. Bye!\n");
+		return 0;
+	}
+
+	//if(pressed && !exist)
+	//set clock
+	struct timespec start;
+	timespec_get(&start, TIME_UTC);
+
+	save_value();
+
+	// wait for rising edge
+	do
+	{
+		rised = wait_for_rising_edge(&timeout);
+		if(rised)
+		{
+			exist = wait_for_falling_edge(&bouncingtime);
+		}
+	} while (rised && exist);
+
+	if(!rised)
+	{
+		printf("Reciving closed. Bye!\n");
+		return 0;
+	}
+
+	if(rised && !exist)
+	{
+		printf("wait for new tap\n");
+	}
+	return 1;
 }
 
 int main(int argc, char **argv)
@@ -483,9 +548,8 @@ int main(int argc, char **argv)
 	unsigned int val;
 	int i, ret, err;
 	char str[MAX_LIMIT],str1[MAX_LIMIT*10];
-	struct timespec timeout = {10, 0};
+
 	struct timespec timelapse = {0, 0};
-	struct timespec bouncingtime = { 0,  40000000};
 	struct timespec basetime = {0 , 500000000};
 
 	convert(str, str1);
@@ -521,24 +585,24 @@ int main(int argc, char **argv)
 
 	/* TRANSMIT */
 	val = 0;
-  	int timeset = 1;
+	  int timeset = 1;
 	for (i = 0; i < strlen(str1); i++) {
-        
-        switch (str1[i])
-        {
-        case '.':
-            timeset = 1;
-            val = 1;
-            break;
-        case '/':
-            timeset = 3;
-            val = 0;
-            break;        
-        case '-':
-            timeset = 3;
-            val = 1;
-            break;
-        }
+		
+		switch (str1[i])
+		{
+		case '.':
+			timeset = 1;
+			val = 1;
+			break;
+		case '/':
+			timeset = 3;
+			val = 0;
+			break;        
+		case '-':
+			timeset = 3;
+			val = 1;
+			break;
+		}
 
 		ret = gpiod_line_set_value(output_line, val);
 		if (ret < 0) {
@@ -550,68 +614,35 @@ int main(int argc, char **argv)
 		printf("Show %c sign\n", str1[i]);
 		sleep(timeset);
 
-        if(str1[i] != '/')
-        {
-            val = 0;
-		    ret = gpiod_line_set_value(output_line, val);
-    		if (ret < 0) {
-	    		perror("Set line output failed\n");
+		if(str1[i] != '/')
+		{
+			val = 0;
+			ret = gpiod_line_set_value(output_line, val);
+			if (ret < 0) {
+				perror("Set line output failed\n");
 				gpiod_line_release(output_line);
 				gpiod_chip_close(chip);
 				return(EXIT_FAILURE);
-    		}
-		    sleep(1);
-        }
+			}
+			sleep(1);
+		}
 	}
 
 	printf("Czekaj na potwierdzenie odbiorcy. Consumer = %s\n", RECIVER);
 
-    /*  RECIVE */
-	int pressed, rised, exist = 0;
+	err = gpiod_line_request_both_edges_events(input_line, RECIVER);
+	if(err) 
+	{
+		cleanup_gpio();
+		return(EXIT_FAILURE);
+	}
+
+	/*  RECIVE */
+	int recived;
 	do
 	{
-		pressed = wait_for_falling_edge(&timeout);
-		printf("after pressed button\n");
-		if(pressed)
-		{
-			exist = wait_for_rising_edge(&bouncingtime);
-			printf("after waiting bouncing time\n");
-		}
-	} while (pressed && exist);
-	
-	if(!pressed)
-	{
-		printf("Reciving closed. Bye!\n");
-	}
-
-	if(pressed && !exist)
-	{
-		//set clock
-		struct timespec start;
-    	timespec_get(&start, TIME_UTC);
-
-		save_value();
-
-		// wait for rising edge
-		do
-		{
-			rised = wait_for_rising_edge(&timeout);
-			if(rised)
-			{
-				exist = wait_for_falling_edge(&bouncingtime);
-			}
-		} while (rised && exist);
-
-		if(!rised)
-		{
-			printf("Reciving closed. Bye!\n");
-		}
-
-		if(rised && exist)
-		{
-			printf("wait for new tap\n");
-		}
-	}
+		recived = recive_signal();
+	} while( recived );
 
 	return 0;
 }

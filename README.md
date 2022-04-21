@@ -21,3 +21,36 @@ oczekiwanie na puszczenie przycisku - zbocze wzrastające -> timeout - 10s
 
 press button -> falling edge
 release button -> rising edge
+
+CLICK TIME
+przy szybkim kliknaniu wynosi: 25-50 ms
+To jest blisko czasu bouncing time. Stąd przy szybkim klikaniu odczyty z GPIO mogą być nieprawidłowe.
+
+kod sprawdzający:
+	struct timespec start, stop, diff;  
+	while(1)
+	{
+		printf("cick fast\n");
+		wait_for_falling_edge(&timeout);
+		
+		printf("after pressed button\n");
+		wait_for_rising_edge(&timeout);
+		timespec_get(&stop, TIME_UTC);
+		printf("after release button\n");
+		if(stop.tv_nsec < start.tv_nsec) {
+			diff.tv_nsec = 1000000000 + stop.tv_nsec - start.tv_nsec;
+			diff.tv_sec = stop.tv_sec - start.tv_sec - 1;
+		}
+		else
+		{
+			diff.tv_nsec = stop.tv_nsec - start.tv_nsec;
+			diff.tv_sec = stop.tv_sec - start.tv_sec;
+		}
+		printf("click time: %ld, %d\n", diff.tv_sec, diff.tv_nsec);
+	}
+
+TODO 
+Wczytywanie X z pustego wejścia
+
+Żródła
+https://github.com/dibaggioj/morse-code
