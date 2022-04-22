@@ -485,70 +485,34 @@ int wait_for_rising_edge(struct timespec* timeout)
 	return val;
 }
 
-void save_value()
-{
-	int val = gpiod_line_get_value(input_line);
-	if(val < 0) {
-		perror("gpiod_line_get_value_bulk");
-		cleanup_gpio();
-		exit(1);
-	}
-	printf("val = %d\n", val);
-}
-
 int recive_signal(char *recived_text, int *i)
 {
 	int pressed, rised, exist = 0;
-	do
-	{
+	do{
 		pressed = wait_for_falling_edge(&timeout);
-		printf("after pressed button\n");
-		if(pressed)
-		{
+		if(pressed){
 			exist = wait_for_rising_edge(&bouncingtime);
-			printf("after waiting bouncing time\n");
 		}
 	} while (pressed && exist);
 	
-	if(!pressed)
-	{
-		printf("Reciving closed. Bye!\n");
-		return 0;
-	}
+	if(!pressed) return 0;
 
 	if(is_on)
 	{
-		printf("break\n");
 		timespec_get(&stop, TIME_UTC);
-		printf("stop timer: %ld %ld\n", stop.tv_sec, stop.tv_nsec);
 		interval = (stop.tv_sec-start.tv_sec)*1000000000 + stop.tv_nsec-start.tv_nsec;
-		printf("start: %d %d\nstop: %d %d\ninterval %d %d\n",start.tv_sec, start.tv_nsec, stop.tv_sec, stop.tv_nsec,  (stop.tv_sec-start.tv_sec), (stop.tv_nsec-start.tv_nsec) );
 		timespec_get(&start, TIME_UTC);
-		double dist = (double)interval / MORSE_UNIT;
-		printf("dist: %f\n",dist);		
-		printf("break interval: %ld\n",interval);
-		printf("(TOLERANCE+SPACE_INTERUNIT): %ld\n",SPACE_INTERUNIT);
-		printf("interval < SPACE_INTERUNIT: %d, %ld\n", (interval-SPACE_INTERUNIT), (interval-SPACE_INTERUNIT));
-		if(interval < SPACE_INTERUNIT) {/*do nothing*/ printf("nothing\n");}
-		else if(interval < SPACE_INTERCHAR) 
-		{
+		if(interval < SPACE_INTERUNIT) {/*do nothing*/}
+		else if(interval < SPACE_INTERCHAR) {
 			recived_text[(*i)++] = SLASH;
-			printf("#####text: %s\n", recived_text);
+		}else{
+			recived_text[(*i)++] = SLASH;
+			recived_text[(*i)++] = SLASH;
 		}
-		else
-		{
-			recived_text[(*i)++] = SLASH;
-			recived_text[(*i)++] = SLASH;
-			printf("#####text: %s\n", recived_text);
-		}
-	}
-	else
-	{
+	}else{
 		is_on = 1;
 		timespec_get(&start, TIME_UTC);
 	}
-
-	save_value();
 
 	// wait for rising edge
 	do
@@ -560,17 +524,11 @@ int recive_signal(char *recived_text, int *i)
 		}
 	} while (rised && exist);
 
-	if(!rised)
-	{
-		printf("Reciving closed. Bye!\n");
-		return 0;
-	}
+	if(!rised) return 0;
 
 	timespec_get(&stop, TIME_UTC);
 	interval = (stop.tv_sec-start.tv_sec)*1000000000 + stop.tv_nsec-start.tv_nsec;
 	timespec_get(&start, TIME_UTC);
-	printf("set timer: %ld %ld\n", start.tv_sec, start.tv_nsec);
-	printf("press interval: %ld\n",interval);
 	if(interval < LENGTH_DOT) recived_text[(*i)++] = DOT;
 	else recived_text[(*i)++] = DAH;
 
@@ -611,7 +569,6 @@ int main(int argc, char **argv)
 		gpiod_chip_close(chip);
 		return(EXIT_FAILURE);
 	}
-	printf("open input and output line55\n");
 
 	ret = gpiod_line_request_output(output_line, TRANSMITER, 1);
 	if (ret < 0) {
@@ -621,7 +578,7 @@ int main(int argc, char **argv)
 		return(EXIT_FAILURE);
 	}
 
-	/* TRANSMIT */
+	printf("TRANSMIT CODE\n");
 	val = 0;
 	int timeset = 1;
 	for (i = 0; i < strlen(str1); i++) {
@@ -666,8 +623,6 @@ int main(int argc, char **argv)
 		}
 	}
 
-	printf("Czekaj na potwierdzenie odbiorcy. Consumer = %s\n", RECIVER);
-
 	err = gpiod_line_request_both_edges_events(input_line, RECIVER);
 	if(err) 
 	{
@@ -675,14 +630,14 @@ int main(int argc, char **argv)
 		return(EXIT_FAILURE);
 	}
 
-	/*  RECIVE */
+	printf("WAIT FOR RECIVE\n");
 	int recived, idx=0;
 	char recived_text[1000];
 	recived_text[idx++] = SLASH;
 	do
 	{
-		printf("wait for new tap\n");
 		recived = recive_signal(recived_text, &idx);
+		printf("recived text: %s\n", recived_text);
 	} while( recived );
 
 	recived_text[idx++] = SLASH;
