@@ -19,12 +19,14 @@ struct gpiod_line *input_line;
 struct gpiod_line_event event;
 struct timespec timeout = {10, 0};
 struct timespec bouncingtime = { 0,  40000000};
+const struct timespec ctimeout = {10, 0};
+const struct timespec cbouncingtime = { 0,  100000000};
 
 const static char DOT = '.';
 const static char DAH = '-';
 const static char SLASH = '/';
 
-const static long int MORSE_UNIT =        800000000; //ns
+const static long int MORSE_UNIT =        1000000000; //ns
 const static long int LENGTH_DOT =        1 * MORSE_UNIT;
 const static long int BLINK_DAH =         3 * MORSE_UNIT;
 const static long int SPACE_INTERUNIT =   1 * MORSE_UNIT;
@@ -423,18 +425,18 @@ void cleanup_gpio()
 	gpiod_chip_close(chip);
 }
 
-int wait_for_falling_edge(struct timespec* timeout)
+int wait_for_falling_edge(struct timespec* time)
 {
 	int err, val = 1;
 	printf("waiting for falling edge event\n");
-	err = gpiod_line_event_wait(input_line, timeout);
+	err = gpiod_line_event_wait(input_line, time);
 	if(err == -1) {
 		perror("gpiod_line_event_wait");
 		cleanup_gpio();
 		exit(1);
 	} else if(err == 0) {
 		fprintf(stderr, "wait timed out\n");
-		val = 0;
+		return -1;
 	}
 
 	if(val) {
@@ -454,18 +456,42 @@ int wait_for_falling_edge(struct timespec* timeout)
 	return val;
 }
 
-int wait_for_rising_edge(struct timespec* timeout)
+int wait_for_bouncing(struct timespec* time)
+{
+	int err, val = 1;
+	printf("waiting for bouncing edge event\n");
+	err = gpiod_line_event_wait(input_line, time);
+	if(err == -1) {
+		perror("gpiod_line_event_wait");
+		cleanup_gpio();
+		exit(1);
+	} else if(err == 0) {
+		fprintf(stderr, "wait timed out\n");
+		return 0;
+	}
+
+	err = gpiod_line_event_read(input_line, &event);
+	if(err) {
+		perror("gpiod_line_event_read");
+		cleanup_gpio();
+		exit(1);
+	}
+	
+	return 1;
+}
+
+int wait_for_rising_edge(struct timespec* time)
 {
 	int err, val = 1;
 	printf("waiting for rising edge event\n");
-	err = gpiod_line_event_wait(input_line, timeout);
+	err = gpiod_line_event_wait(input_line, time);
 	if(err == -1){
 		perror("gpiod_line_event_wait");
 		cleanup_gpio();
 		exit(1);
 	} else if(err == 0) {
 		fprintf(stderr, "wait timed out\n");
-		val = 0;
+		return -1;
 	}
 
 	if(val) {
@@ -488,14 +514,20 @@ int wait_for_rising_edge(struct timespec* timeout)
 int recive_signal(char *recived_text, int *i)
 {
 	int pressed, rised, exist = 0;
+
+	printf("wait for press\n");
+	pressed = wait_for_falling_edge(&timeout);
+	timeout.tv_sec = 10;
+	timeout.tv_nsec = 0;
+	if(pressed == -1) return 0;
 	do{
-		pressed = wait_for_falling_edge(&timeout);
-		if(pressed){
-			exist = wait_for_rising_edge(&bouncingtime);
-		}
-	} while (pressed && exist);
+		printf("wait for bouncing\n");
+		exist = wait_for_bouncing(&bouncingtime);
+		bouncingtime.tv_sec = 0;
+		bouncingtime.tv_nsec = 40000000;
+	} while (exist);
 	
-	if(!pressed) return 0;
+
 
 	if(is_on)
 	{
@@ -515,16 +547,18 @@ int recive_signal(char *recived_text, int *i)
 	}
 
 	// wait for rising edge
-	do
-	{
-		rised = wait_for_rising_edge(&timeout);
-		if(rised)
-		{
-			exist = wait_for_falling_edge(&bouncingtime);
-		}
-	} while (rised && exist);
+	printf("wait for release\n");
+	rised = wait_for_rising_edge(&timeout);
+	timeout.tv_sec = 10;
+	timeout.tv_nsec = 0;
+	if(rised == -1) return 0;
 
-	if(!rised) return 0;
+	do{
+		printf("wait for bouncing\n");
+		exist = wait_for_bouncing(&bouncingtime);
+		bouncingtime.tv_sec = 0;
+		bouncingtime.tv_nsec = 40000000;
+	} while (exist);
 
 	timespec_get(&stop, TIME_UTC);
 	interval = (stop.tv_sec-start.tv_sec)*1000000000 + stop.tv_nsec-start.tv_nsec;
@@ -538,15 +572,14 @@ int recive_signal(char *recived_text, int *i)
 int main(int argc, char **argv)
 {
 	char *chipname = "gpiochip0";
-	unsigned int output_line_num = 24;	// GPIO Pin #23
-	unsigned int input_line_num = 13; 	// GPIO Pin #22
-	unsigned int error_line_num = 10; 	// GPIO Pin #10
+	unsigned int output_line_num = 24;	// GPIO Pin #24
+	unsigned int input_line_num = 10; 	// GPIO Pin #10
 	unsigned int val;
 	int i, ret, err;
 	char str[MAX_LIMIT],str1[MAX_LIMIT*10];
 
 	struct timespec timelapse = {0, 0};
-	struct timespec basetime = {0 , 500000000};
+	struct timespec basetime = {0, 500000000};
 
 	convert(str, str1);
 
