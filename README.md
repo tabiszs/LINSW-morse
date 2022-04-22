@@ -32,6 +32,7 @@ kod sprawdzający:
 	{
 		printf("cick fast\n");
 		wait_for_falling_edge(&timeout);
+		timespec_get(&start, TIME_UTC);
 		
 		printf("after pressed button\n");
 		wait_for_rising_edge(&timeout);

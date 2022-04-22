@@ -18,15 +18,22 @@ struct gpiod_line *output_line;
 struct gpiod_line *input_line;
 struct gpiod_line_event event;
 struct timespec timeout = {10, 0};
-struct timespec bouncingtime = { 0,  20000000};
+struct timespec bouncingtime = { 0,  40000000};
 
-const static int MORSE_UNIT =        120;
-const static int LENGTH_DOT =        1 * MORSE_UNIT;
-const static int BLINK_DAH =         3 * MORSE_UNIT;
-const static int SPACE_INTERUNIT =   1 * MORSE_UNIT;
-const static int SPACE_INTERCHAR =   3 * MORSE_UNIT;
-const static int SPACE_INTERWORD =   7 * MORSE_UNIT;
-const static int SPACE_INTERCHAR_REMAINING =   SPACE_INTERCHAR - SPACE_INTERUNIT; // character already ends with an inter-unit space, so deduct that
+const static char DOT = '.';
+const static char DAH = '-';
+const static char SLASH = '/';
+
+const static long int MORSE_UNIT =        800000000; //ns
+const static long int LENGTH_DOT =        1 * MORSE_UNIT;
+const static long int BLINK_DAH =         3 * MORSE_UNIT;
+const static long int SPACE_INTERUNIT =   1 * MORSE_UNIT;
+const static long int SPACE_INTERCHAR =   3 * MORSE_UNIT;
+const static long int SPACE_INTERWORD =   7 * MORSE_UNIT;
+const static long int SPACE_INTERCHAR_REMAINING =   SPACE_INTERCHAR - SPACE_INTERUNIT; // character already ends with an inter-unit space, so deduct that
+
+long int interval, is_on = 0;
+struct timespec start, stop;
 
 void convert(char* str, char* str1)
 {
@@ -489,7 +496,7 @@ void save_value()
 	printf("val = %d\n", val);
 }
 
-int recive_signal()
+int recive_signal(char *recived_text, int *i)
 {
 	int pressed, rised, exist = 0;
 	do
@@ -509,10 +516,37 @@ int recive_signal()
 		return 0;
 	}
 
-	//if(pressed && !exist)
-	//set clock
-	struct timespec start;
-	timespec_get(&start, TIME_UTC);
+	if(is_on)
+	{
+		printf("break\n");
+		timespec_get(&stop, TIME_UTC);
+		printf("stop timer: %ld %ld\n", stop.tv_sec, stop.tv_nsec);
+		interval = (stop.tv_sec-start.tv_sec)*1000000000 + stop.tv_nsec-start.tv_nsec;
+		printf("start: %d %d\nstop: %d %d\ninterval %d %d\n",start.tv_sec, start.tv_nsec, stop.tv_sec, stop.tv_nsec,  (stop.tv_sec-start.tv_sec), (stop.tv_nsec-start.tv_nsec) );
+		timespec_get(&start, TIME_UTC);
+		double dist = (double)interval / MORSE_UNIT;
+		printf("dist: %f\n",dist);		
+		printf("break interval: %ld\n",interval);
+		printf("(TOLERANCE+SPACE_INTERUNIT): %ld\n",SPACE_INTERUNIT);
+		printf("interval < SPACE_INTERUNIT: %d, %ld\n", (interval-SPACE_INTERUNIT), (interval-SPACE_INTERUNIT));
+		if(interval < SPACE_INTERUNIT) {/*do nothing*/ printf("nothing\n");}
+		else if(interval < SPACE_INTERCHAR) 
+		{
+			recived_text[(*i)++] = SLASH;
+			printf("#####text: %s\n", recived_text);
+		}
+		else
+		{
+			recived_text[(*i)++] = SLASH;
+			recived_text[(*i)++] = SLASH;
+			printf("#####text: %s\n", recived_text);
+		}
+	}
+	else
+	{
+		is_on = 1;
+		timespec_get(&start, TIME_UTC);
+	}
 
 	save_value();
 
@@ -532,10 +566,14 @@ int recive_signal()
 		return 0;
 	}
 
-	if(rised && !exist)
-	{
-		printf("wait for new tap\n");
-	}
+	timespec_get(&stop, TIME_UTC);
+	interval = (stop.tv_sec-start.tv_sec)*1000000000 + stop.tv_nsec-start.tv_nsec;
+	timespec_get(&start, TIME_UTC);
+	printf("set timer: %ld %ld\n", start.tv_sec, start.tv_nsec);
+	printf("press interval: %ld\n",interval);
+	if(interval < LENGTH_DOT) recived_text[(*i)++] = DOT;
+	else recived_text[(*i)++] = DAH;
+
 	return 1;
 }
 
@@ -585,7 +623,7 @@ int main(int argc, char **argv)
 
 	/* TRANSMIT */
 	val = 0;
-	  int timeset = 1;
+	int timeset = 1;
 	for (i = 0; i < strlen(str1); i++) {
 		
 		switch (str1[i])
@@ -638,11 +676,16 @@ int main(int argc, char **argv)
 	}
 
 	/*  RECIVE */
-	int recived;
+	int recived, idx=0;
+	char recived_text[1000];
+	recived_text[idx++] = SLASH;
 	do
 	{
-		recived = recive_signal();
+		printf("wait for new tap\n");
+		recived = recive_signal(recived_text, &idx);
 	} while( recived );
 
+	recived_text[idx++] = SLASH;
+	printf("recived text: %s\n", recived_text);
 	return 0;
 }
