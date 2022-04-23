@@ -1,57 +1,35 @@
 # LINSW-morse
-Program for excercise 2 on Linux in Systems Embeded lecture.
+Program for laboratory 2 from Linux in Systems Embeded lecture.
 
-Transmiter of morse code and reciver of acknowledgement from user.
+Transmiter and revicer morse code with usage gpiod library.
 
-Program works on RapsberryPi4.
+# Environment
+## Real
+Program works on RapsberryPi4 with adapter.
+https://gitlab.com/WZab/wz_edu_boards/-/tree/main/rpi4_adapter
 
-# Avoiding Bouncing inside buttons
+## Virtual
+Program works also on Virtual Machine with virtual adapter.
+https://github.com/wzab/BR_Internet_Radio/tree/gpio_simple_2021.02
+In this case it is needed to change gpiod pins.
 
-A oczekiwanie na naciśnięcie przycisku - 10s
+# Logic
+1. Type text to transmit
+2. Transmit code via led on 24 pin.
+3. Revice code from user via button on 10 pin.
 
-B oczekiwanie na zbocze wzrastające
-    a) wystąpiło w czasie 40ms -> znowu oczekujemy na naciśnięcie przycisku - 10s
-	b) timeout
+# Bouncing
+Program provide handling bouncing inside buttons. Bouncing time is set for 40ms.
 
-C zanotowanie, że naciśnięto przycisk 
-oczekiwanie na puszczenie przycisku - zbocze wzrastające -> timeout - 10s
-	a) wystąpiło w czasie 10s -> zinterpretuj i wróć do A
-	b) przerwij odbieranie. Błąd
+# Morse Code
+Program revice and transimit in MORSE-UNIT which is 1sec.
+After 10sec waiting for change button state program close.
 
+# Handling button
+- When button is pressed then occured falling edge.
+- When button is released then occured rising edge.
+- When bouncing occures then is set bouncin timeout which is set again after changing edge in bouncing time.
 
-press button -> falling edge
-release button -> rising edge
-
-CLICK TIME
-przy szybkim kliknaniu wynosi: 25-50 ms
-To jest blisko czasu bouncing time. Stąd przy szybkim klikaniu odczyty z GPIO mogą być nieprawidłowe.
-
-kod sprawdzający:
-	struct timespec start, stop, diff;  
-	while(1)
-	{
-		printf("cick fast\n");
-		wait_for_falling_edge(&timeout);
-		timespec_get(&start, TIME_UTC);
-		
-		printf("after pressed button\n");
-		wait_for_rising_edge(&timeout);
-		timespec_get(&stop, TIME_UTC);
-		printf("after release button\n");
-		if(stop.tv_nsec < start.tv_nsec) {
-			diff.tv_nsec = 1000000000 + stop.tv_nsec - start.tv_nsec;
-			diff.tv_sec = stop.tv_sec - start.tv_sec - 1;
-		}
-		else
-		{
-			diff.tv_nsec = stop.tv_nsec - start.tv_nsec;
-			diff.tv_sec = stop.tv_sec - start.tv_sec;
-		}
-		printf("click time: %ld, %d\n", diff.tv_sec, diff.tv_nsec);
-	}
-
-TODO 
-Wczytywanie X z pustego wejścia
-
-Żródła
-https://github.com/dibaggioj/morse-code
+# Click time
+Bouncing time need to press button for more then 40ms. My experimets shows that quick clicking take only 25-50ms.
+If you are really fast in transmitting morse code. Be careful!
