@@ -1,4 +1,4 @@
-# LINSW-morse
+# LINSW-morse-transmitter-receiver
 Program for laboratory no. 2 from Linux in Systems Embeded lecture.
 
 Transmiter and revicer morse code with usage gpiod library.
